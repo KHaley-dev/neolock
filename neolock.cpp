@@ -123,6 +123,11 @@ bool fileHasFragment(string s, string f){
     return false;
 }
 
+string currentWorkspace(){
+    string s = getExec("hyprctl activewindow | grep \"workspace: \" | cut -d\' \' -f2");
+    return s;
+}
+
 int32_t main(int32_t argc, char* argv[]){
 
 // checking flags
@@ -155,7 +160,7 @@ int32_t main(int32_t argc, char* argv[]){
                 while(getline(inf,line)){
                     nc << line << '\n';
                 }
-                nc << "allow_remote_access  yes";
+                nc << "allow_remote_control yes";
                 inf.close();
                 ofstream outf(kittypath);
                 outf << nc.str();
@@ -183,6 +188,9 @@ int32_t main(int32_t argc, char* argv[]){
         cout<<"No password set! Try -h or --help";
         return 0;
     }
+
+// get current workspace and save it
+    string cworkspace = currentWorkspace();
 
 // move to workspace 11
     system(exec("hyprctl dispatch movetoworkspace 11"));
@@ -230,13 +238,13 @@ int32_t main(int32_t argc, char* argv[]){
     string pids = getExec("pgrep -x kitty");
     sendSignals(pids);
 
-// disable workspace switching and SUPER_V
+// disable workspace switching and other methods of exiting
     string hyperconfpath = string(getenv("HOME")) + "/.config/hypr/hyprland.conf";
     ifstream hci(hyperconfpath);
     stringstream nhc;
     line = "";
     while(getline(hci,line)){
-        if(hasFragment(line, "workspace")){
+        if(hasFragment(line, "workspace") && hasFragment(line, "bind = ") && line[0]!='#'){
             nhc << '#' << line << '\n';
         } else {
             nhc << line << '\n';
@@ -306,7 +314,7 @@ int32_t main(int32_t argc, char* argv[]){
     stringstream nhc2;
     line = "";
     while(getline(hci2,line)){
-        if(hasFragment(line, "workspace") && line[0] == '#'){
+        if(hasFragment(line, "workspace") && hasFragment(line, "bind =") && line[0] == '#'){
             for(int i=1;i<line.length();i++){
                 nhc2 << line[i];
             }
@@ -319,6 +327,9 @@ int32_t main(int32_t argc, char* argv[]){
     ofstream hco2(hyperconfpath);
     hco2 << nhc2.str();
     hco2.close();
+
+// move to last workspace
+    system(exec("hyprctl dispatch movetoworkspace " + cworkspace));
 
 // kill the terminal:
     system(exec("kitty @ close-window"));
